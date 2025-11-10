@@ -8,6 +8,8 @@ let gl;
 let programInfo;
 let cube;
 let camera;
+// Para controle de câmera
+let cameraModeIndex = 0;
 let rotation = 0.0;
 
 async function init() {
@@ -38,7 +40,22 @@ async function init() {
 
     // Initialize objects
     cube = new Cube(gl);
+
     camera = new Camera();
+
+    // Listener para troca de câmera
+    window.addEventListener('keydown', (e) => {
+        if (e.key === '1') {
+            cameraModeIndex = 0;
+            camera.switchMode(0);
+        } else if (e.key === '2') {
+            cameraModeIndex = 1;
+            camera.switchMode(1);
+        } else if (e.key === '3') {
+            cameraModeIndex = 2;
+            camera.switchMode(2);
+        }
+    });
 
     // Start render loop
     requestAnimationFrame(render);
@@ -58,7 +75,12 @@ function render() {
     gl.depthFunc(gl.LEQUAL);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    // Update camera
+
+    // Placeholder: posição e direção da nave (cube)
+    // Aqui, a nave está sempre na origem e olhando para Z+
+    const shipPosition = [0, 0, 0];
+    const shipDirection = [0, 0, 1];
+    camera.setShipTransform(shipPosition, shipDirection);
     camera.updateViewMatrix();
 
     // Create and update model matrix
