@@ -117,3 +117,14 @@ function render() {
 
 // Start the application
 init().catch(console.error);
+
+// HUD DURANTE O JOGO
+import { HUD } from './src/ui/hud.js';
+
+const hud = new HUD();
+
+// Quando ganhar pontos:
+//hud.updateScore(100);
+
+// Quando perder vida:
+//hud.updateLives(2);
