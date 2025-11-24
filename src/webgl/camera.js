@@ -4,8 +4,8 @@ import { mat4, vec3 } from 'https://cdn.skypack.dev/gl-matrix';
 
 export class Camera {
     constructor() {
-        // Camera modes: 'third', 'first', 'side'
-        this.modes = ['third', 'first', 'side'];
+        // Camera modes: 'third', 'first'
+        this.modes = ['third', 'first'];
         this.mode = 'third';
 
         // Nave (objeto de referência)
@@ -72,22 +72,20 @@ export class Camera {
             ];
             fov = 60 * Math.PI / 180;
         } else if (this.mode === 'side') {
-            // Lateral (direita da nave)
-            // Calcula vetor lateral (right)
-            const right = vec3.create();
-            vec3.cross(right, shipDir, up);
-            vec3.normalize(right, right);
+            // Lateral melhorada - vista de lado com perspectiva diagonal
+            // Posiciona câmera à direita e ligeiramente atrás da nave
             pos = [
-                shipPos[0] + right[0] * 6,
-                shipPos[1] + 1,
-                shipPos[2] + right[2] * 6
+                shipPos[0] + 8,  // Mais à direita
+                shipPos[1] + 3,  // Mais alto para melhor visão
+                shipPos[2] - 2   // Ligeiramente atrás
             ];
+            // Mira ligeiramente à frente da nave para ver a direção do movimento
             target = [
                 shipPos[0],
-                shipPos[1],
-                shipPos[2]
+                shipPos[1] + 0.3,  // Foca um pouco acima do centro da nave
+                shipPos[2] + 1     // Mira ligeiramente à frente
             ];
-            fov = 50 * Math.PI / 180;
+            fov = 55 * Math.PI / 180;  // FOV um pouco maior para melhor contexto
         } else {
             // fallback
             pos = this.position;
