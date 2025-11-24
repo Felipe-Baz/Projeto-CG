@@ -3,6 +3,7 @@ import { createShader, createProgram, loadShader } from './webgl/shaderUtils.js'
 import { Camera } from './webgl/camera.js';
 import { Ship } from './game/player.js';
 import { World } from './game/world.js';
+import { AsteroidManager } from './game/obstacle.js';
 import { mat4 } from 'https://cdn.skypack.dev/gl-matrix';
 
 let gl;
@@ -10,6 +11,7 @@ let programInfo;
 let ship;
 let world;
 let camera;
+let asteroidManager;
 // Para controle de câmera
 let cameraModeIndex = 0;
 // Game timing
@@ -44,6 +46,7 @@ async function init() {
     // Initialize objects
     ship = new Ship(gl);
     world = new World(gl, 20);
+    asteroidManager = new AsteroidManager(gl, ship);
     console.log('Ship created at position:', ship.getPosition());
 
     camera = new Camera();
@@ -67,6 +70,15 @@ async function init() {
 function update(deltaTime) {
     // Update ship
     ship.update(deltaTime);
+    
+    // Update asteroids and check collisions
+    const collisionResult = asteroidManager.update(deltaTime);
+    if (collisionResult.collision && hud) {
+        hud.loseLife();
+        if (hud.isGameOver()) {
+            console.log('Game Over!');
+        }
+    }
     
     // Update camera to follow ship
     const shipPosition = ship.getPosition();
@@ -95,6 +107,9 @@ function draw() {
 
     // Draw the world grid
     world.draw(programInfo, camera.getViewMatrix(), camera.getProjectionMatrix());
+
+    // Draw asteroids
+    asteroidManager.draw(programInfo, camera.getViewMatrix(), camera.getProjectionMatrix());
 
     // Draw the ship
     ship.draw(programInfo, camera.getViewMatrix(), camera.getProjectionMatrix());
@@ -130,19 +145,6 @@ async function initGame() {
     
     // Inicializa HUD após carregar tudo
     hud = new HUD();
-    
-    // Exemplo de uso:
-    hud.updateScore(100);
-
-    hud.loseLife();
-
-    hud.loseLife();
-
-    hud.gainLife();
-
-    if (hud.isGameOver()) {
-        console.log('Game Over!');
-    }
 }
 
 // Start the application
