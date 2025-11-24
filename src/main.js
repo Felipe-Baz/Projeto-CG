@@ -132,8 +132,17 @@ async function initGame() {
     hud = new HUD();
     
     // Exemplo de uso:
-    // hud.updateScore(100);
-    // hud.updateLives(2);
+    hud.updateScore(100);
+
+    hud.loseLife();
+
+    hud.loseLife();
+
+    hud.gainLife();
+
+    if (hud.isGameOver()) {
+        console.log('Game Over!');
+    }
 }
 
 // Start the application
