@@ -16,7 +16,7 @@ export class Ship {
         this.gridSize = 1.0; // Size of each grid cell
         
         // Movement
-        this.speed = 0.1; // Grid cells per update
+        this.speed = 0.15; // Grid cells per update (aumentado de 0.1 para 0.15)
         this.velocity = { x: 0, z: 0 };
         
         // Input state

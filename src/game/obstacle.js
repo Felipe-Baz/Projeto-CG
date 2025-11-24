@@ -106,13 +106,13 @@ export class AsteroidManager {
         
         // Spawn settings - initial values
         this.spawnTimer = 0;
-        this.baseSpawnInterval = 1.5; // Base spawn interval
+        this.baseSpawnInterval = 0.8; // Base spawn interval (mais rápido)
         this.spawnInterval = this.baseSpawnInterval;
         this.spawnDistance = 15; // Distance ahead of ship
-        this.baseSpawnRangeX = 12; // Initial horizontal spawn range (aumentado de 8 para 12)
+        this.baseSpawnRangeX = 10; // Initial horizontal spawn range
         this.spawnRangeX = this.baseSpawnRangeX;
-        this.baseMinSpeed = 3;
-        this.baseMaxSpeed = 6;
+        this.baseMinSpeed = 4;
+        this.baseMaxSpeed = 7;
         this.minSpeed = this.baseMinSpeed;
         this.maxSpeed = this.baseMaxSpeed;
         
@@ -121,6 +121,11 @@ export class AsteroidManager {
         this.difficultyLevel = 0;
         this.difficultyInterval = 10; // Increase difficulty every 10 seconds
         this.nextDifficultyTime = this.difficultyInterval;
+        
+        // Wave system - spawn clusters of asteroids
+        this.waveTimer = 0;
+        this.waveInterval = 5; // Wave every 5 seconds
+        this.isWaveActive = false;
     }
     
     update(deltaTime) {
@@ -131,6 +136,13 @@ export class AsteroidManager {
         if (this.gameTime >= this.nextDifficultyTime) {
             this.increaseDifficulty();
             this.nextDifficultyTime += this.difficultyInterval;
+        }
+        
+        // Update wave timer
+        this.waveTimer += deltaTime;
+        if (this.waveTimer >= this.waveInterval) {
+            this.spawnWave();
+            this.waveTimer = 0;
         }
         
         // Update spawn timer
@@ -177,18 +189,18 @@ export class AsteroidManager {
     increaseDifficulty() {
         this.difficultyLevel++;
         
-        // Increase spawn rate (reduce interval, minimum 0.4 seconds)
-        this.spawnInterval = Math.max(0.4, this.baseSpawnInterval - (this.difficultyLevel * 0.15));
+        // Increase spawn rate (reduce interval, minimum 0.3 seconds)
+        this.spawnInterval = Math.max(0.3, this.baseSpawnInterval - (this.difficultyLevel * 0.08));
         
-        // Increase asteroid speed
-        this.minSpeed = this.baseMinSpeed + (this.difficultyLevel * 0.5);
-        this.maxSpeed = this.baseMaxSpeed + (this.difficultyLevel * 0.8);
+        // Increase asteroid speed gradually
+        this.minSpeed = this.baseMinSpeed + (this.difficultyLevel * 0.4);
+        this.maxSpeed = this.baseMaxSpeed + (this.difficultyLevel * 0.6);
         
-        // Increase spawn range (wider area) - aumenta 3 unidades por nível
-        this.spawnRangeX = this.baseSpawnRangeX + (this.difficultyLevel * 3);
+        // Increase spawn range moderately - aumenta 2 unidades por nível
+        this.spawnRangeX = this.baseSpawnRangeX + (this.difficultyLevel * 2);
         
         // Slightly increase spawn distance as difficulty increases
-        this.spawnDistance = 15 + (this.difficultyLevel * 0.5);
+        this.spawnDistance = 15 + (this.difficultyLevel * 0.3);
         
         console.log(`🔥 Difficulty Level ${this.difficultyLevel}:`, {
             spawnInterval: this.spawnInterval.toFixed(2) + 's',
@@ -198,17 +210,35 @@ export class AsteroidManager {
         });
     }
     
+    spawnWave() {
+        // Spawn 2-4 asteroids in a cluster pattern
+        const waveSize = 2 + Math.floor(Math.random() * 3);
+        const shipPos = this.ship.getPosition();
+        
+        for (let i = 0; i < waveSize; i++) {
+            // Spawn in a horizontal line pattern with some variation
+            const spacing = 2.5;
+            const offset = (i - waveSize / 2) * spacing;
+            const x = shipPos[0] + offset + (Math.random() - 0.5) * 1;
+            const z = shipPos[2] + this.spawnDistance + (Math.random() - 0.5) * 2;
+            
+            const speed = this.minSpeed + Math.random() * (this.maxSpeed - this.minSpeed);
+            const asteroid = new Asteroid(this.gl, x, z, speed);
+            this.asteroids.push(asteroid);
+        }
+    }
+    
     spawnAsteroid() {
         const shipPos = this.ship.getPosition();
         
-        // 70% chance de spawnar perto da trajetória da nave (corredor central)
-        // 30% chance de spawnar nas laterais (variação)
+        // 75% chance de spawnar perto da trajetória da nave (corredor central)
+        // 25% chance de spawnar nas laterais (variação)
         let x;
-        const spawnInCorridor = Math.random() < 0.7;
+        const spawnInCorridor = Math.random() < 0.75;
         
         if (spawnInCorridor) {
             // Spawn em um corredor mais estreito perto da nave
-            const corridorWidth = 4; // Largura do corredor central
+            const corridorWidth = 5; // Largura do corredor central
             x = shipPos[0] + (Math.random() - 0.5) * corridorWidth;
         } else {
             // Spawn nas laterais (mais longe)
@@ -229,6 +259,7 @@ export class AsteroidManager {
         // Reset all properties to initial values
         this.asteroids = [];
         this.spawnTimer = 0;
+        this.waveTimer = 0;
         this.gameTime = 0;
         this.difficultyLevel = 0;
         this.nextDifficultyTime = this.difficultyInterval;
