@@ -54,3 +54,21 @@
     color: #ffd700;
     filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.6));
 }
+
+.icon-difficulty {
+    color: #00d4ff;
+    filter: drop-shadow(0 0 5px rgba(0, 212, 255, 0.6));
+    animation: pulse 2s ease-in-out infinite;
+}
+
+/* Pulse animation for difficulty icon */
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 5px rgba(0, 212, 255, 0.6));
+    }
+    50% {
+        transform: scale(1.1);
+        filter: drop-shadow(0 0 10px rgba(0, 212, 255, 1));
+    }
+}

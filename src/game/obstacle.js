@@ -54,6 +54,11 @@ export class Asteroid {
         return this.active;
     }
     
+    isPassed(shipZ) {
+        // Check if asteroid passed the ship (scored)
+        return this.z < shipZ - 2;
+    }
+    
     checkCollision(shipPosition, shipRadius = 0.5) {
         const dx = this.x - shipPosition[0];
         const dy = this.y - shipPosition[1];
@@ -99,16 +104,35 @@ export class AsteroidManager {
         this.ship = shipReference;
         this.asteroids = [];
         
-        // Spawn settings
+        // Spawn settings - initial values
         this.spawnTimer = 0;
-        this.spawnInterval = 1.5; // Spawn every 1.5 seconds
+        this.baseSpawnInterval = 1.5; // Base spawn interval
+        this.spawnInterval = this.baseSpawnInterval;
         this.spawnDistance = 15; // Distance ahead of ship
-        this.spawnRangeX = 8; // How far left/right asteroids can spawn
-        this.minSpeed = 3;
-        this.maxSpeed = 6;
+        this.baseSpawnRangeX = 12; // Initial horizontal spawn range (aumentado de 8 para 12)
+        this.spawnRangeX = this.baseSpawnRangeX;
+        this.baseMinSpeed = 3;
+        this.baseMaxSpeed = 6;
+        this.minSpeed = this.baseMinSpeed;
+        this.maxSpeed = this.baseMaxSpeed;
+        
+        // Difficulty progression
+        this.gameTime = 0;
+        this.difficultyLevel = 0;
+        this.difficultyInterval = 10; // Increase difficulty every 10 seconds
+        this.nextDifficultyTime = this.difficultyInterval;
     }
     
     update(deltaTime) {
+        // Update game time and difficulty
+        this.gameTime += deltaTime;
+        
+        // Check if should increase difficulty
+        if (this.gameTime >= this.nextDifficultyTime) {
+            this.increaseDifficulty();
+            this.nextDifficultyTime += this.difficultyInterval;
+        }
+        
         // Update spawn timer
         this.spawnTimer += deltaTime;
         
@@ -117,6 +141,9 @@ export class AsteroidManager {
             this.spawnAsteroid();
             this.spawnTimer = 0;
         }
+        
+        const shipPos = this.ship.getPosition();
+        let scoreGained = 0;
         
         // Update all asteroids
         for (let i = this.asteroids.length - 1; i >= 0; i--) {
@@ -129,24 +156,66 @@ export class AsteroidManager {
                 continue;
             }
             
+            // Check if player dodged asteroid (score points)
+            if (asteroid.isPassed(shipPos[2]) && !asteroid.scored) {
+                asteroid.scored = true;
+                scoreGained += 10;
+            }
+            
             // Check collision with ship
-            const shipPos = this.ship.getPosition();
             if (asteroid.checkCollision(shipPos)) {
                 console.log('Collision detected!');
                 this.asteroids.splice(i, 1);
                 // Return collision event
-                return { collision: true, position: asteroid.getPosition() };
+                return { collision: true, position: asteroid.getPosition(), scoreGained: 0 };
             }
         }
         
-        return { collision: false };
+        return { collision: false, scoreGained: scoreGained };
+    }
+    
+    increaseDifficulty() {
+        this.difficultyLevel++;
+        
+        // Increase spawn rate (reduce interval, minimum 0.4 seconds)
+        this.spawnInterval = Math.max(0.4, this.baseSpawnInterval - (this.difficultyLevel * 0.15));
+        
+        // Increase asteroid speed
+        this.minSpeed = this.baseMinSpeed + (this.difficultyLevel * 0.5);
+        this.maxSpeed = this.baseMaxSpeed + (this.difficultyLevel * 0.8);
+        
+        // Increase spawn range (wider area) - aumenta 3 unidades por nível
+        this.spawnRangeX = this.baseSpawnRangeX + (this.difficultyLevel * 3);
+        
+        // Slightly increase spawn distance as difficulty increases
+        this.spawnDistance = 15 + (this.difficultyLevel * 0.5);
+        
+        console.log(`🔥 Difficulty Level ${this.difficultyLevel}:`, {
+            spawnInterval: this.spawnInterval.toFixed(2) + 's',
+            speed: `${this.minSpeed.toFixed(1)} - ${this.maxSpeed.toFixed(1)}`,
+            spawnRange: `±${(this.spawnRangeX/2).toFixed(1)} units`,
+            spawnDistance: this.spawnDistance.toFixed(1) + ' units ahead'
+        });
     }
     
     spawnAsteroid() {
         const shipPos = this.ship.getPosition();
         
-        // Random position ahead of ship, with horizontal offset
-        const x = shipPos[0] + (Math.random() - 0.5) * this.spawnRangeX;
+        // 70% chance de spawnar perto da trajetória da nave (corredor central)
+        // 30% chance de spawnar nas laterais (variação)
+        let x;
+        const spawnInCorridor = Math.random() < 0.7;
+        
+        if (spawnInCorridor) {
+            // Spawn em um corredor mais estreito perto da nave
+            const corridorWidth = 4; // Largura do corredor central
+            x = shipPos[0] + (Math.random() - 0.5) * corridorWidth;
+        } else {
+            // Spawn nas laterais (mais longe)
+            const sideOffset = 4 + Math.random() * (this.spawnRangeX - 4);
+            x = shipPos[0] + (Math.random() < 0.5 ? -sideOffset : sideOffset);
+        }
+        
         const z = shipPos[2] + this.spawnDistance;
         
         // Random speed
@@ -154,6 +223,19 @@ export class AsteroidManager {
         
         const asteroid = new Asteroid(this.gl, x, z, speed);
         this.asteroids.push(asteroid);
+    }
+    
+    reset() {
+        // Reset all properties to initial values
+        this.asteroids = [];
+        this.spawnTimer = 0;
+        this.gameTime = 0;
+        this.difficultyLevel = 0;
+        this.nextDifficultyTime = this.difficultyInterval;
+        this.spawnInterval = this.baseSpawnInterval;
+        this.spawnRangeX = this.baseSpawnRangeX;
+        this.minSpeed = this.baseMinSpeed;
+        this.maxSpeed = this.baseMaxSpeed;
     }
     
     draw(programInfo, viewMatrix, projectionMatrix) {
@@ -164,5 +246,13 @@ export class AsteroidManager {
     
     getAsteroidCount() {
         return this.asteroids.length;
+    }
+    
+    getDifficultyLevel() {
+        return this.difficultyLevel;
+    }
+    
+    getGameTime() {
+        return this.gameTime;
     }
 }

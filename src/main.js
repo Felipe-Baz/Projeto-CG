@@ -68,15 +68,33 @@ async function init() {
 }
 
 function update(deltaTime) {
+    // Don't update if game over
+    if (gameOverScreen && gameOverScreen.isGameOverActive()) {
+        return;
+    }
+    
     // Update ship
     ship.update(deltaTime);
     
     // Update asteroids and check collisions
     const collisionResult = asteroidManager.update(deltaTime);
+    
+    // Update difficulty level in HUD
+    if (hud) {
+        const currentLevel = asteroidManager.getDifficultyLevel() + 1; // +1 para mostrar level 1, 2, 3...
+        hud.updateLevel(currentLevel);
+    }
+    
+    // Add score for dodged asteroids
+    if (collisionResult.scoreGained > 0 && hud) {
+        hud.addScore(collisionResult.scoreGained);
+    }
+    
+    // Handle collision
     if (collisionResult.collision && hud) {
         hud.loseLife();
         if (hud.isGameOver()) {
-            console.log('Game Over!');
+            handleGameOver();
         }
     }
     
@@ -85,6 +103,14 @@ function update(deltaTime) {
     const shipDirection = ship.getDirection();
     camera.setShipTransform(shipPosition, shipDirection);
     camera.updateViewMatrix();
+}
+
+function handleGameOver() {
+    console.log('Game Over!');
+    const finalScore = hud.getScore();
+    const finalLevel = asteroidManager.getDifficultyLevel() + 1;
+    const gameTime = asteroidManager.getGameTime();
+    gameOverScreen.show(finalScore, finalLevel, gameTime);
 }
 
 function draw() {
@@ -137,14 +163,37 @@ function render(currentTime) {
 
 // HUD DURANTE O JOGO
 import { HUD } from './ui/hud.js';
+import { GameOverScreen } from './ui/gameOver.js';
 
 let hud;
+let gameOverScreen;
+
+function resetGame() {
+    // Reset HUD
+    hud.reset();
+    
+    // Reset ship position
+    ship.gridX = 0;
+    ship.gridZ = 0;
+    ship.velocity = { x: 0, z: 0 };
+    
+    // Reset asteroid manager (clears asteroids and difficulty)
+    asteroidManager.reset();
+    
+    console.log('Game restarted!');
+}
 
 async function initGame() {
     await init();
     
     // Inicializa HUD após carregar tudo
     hud = new HUD();
+    
+    // Inicializa tela de Game Over
+    gameOverScreen = new GameOverScreen();
+    gameOverScreen.onRestart(() => {
+        resetGame();
+    });
 }
 
 // Start the application
