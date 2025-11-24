@@ -1,16 +1,19 @@
 import { initWebGL, resizeCanvasToDisplaySize } from './webgl/initGL.js';
 import { createShader, createProgram, loadShader } from './webgl/shaderUtils.js';
 import { Camera } from './webgl/camera.js';
-import { Cube } from './primitives/cube.js';
+import { Ship } from './game/player.js';
+import { World } from './game/world.js';
 import { mat4 } from 'https://cdn.skypack.dev/gl-matrix';
 
 let gl;
 let programInfo;
-let cube;
+let ship;
+let world;
 let camera;
 // Para controle de câmera
 let cameraModeIndex = 0;
-let rotation = 0.0;
+// Game timing
+let lastTime = 0;
 
 async function init() {
     // Get WebGL context
@@ -39,9 +42,12 @@ async function init() {
     };
 
     // Initialize objects
-    cube = new Cube(gl);
+    ship = new Ship(gl);
+    world = new World(gl, 20);
+    console.log('Ship created at position:', ship.getPosition());
 
     camera = new Camera();
+    camera.updateProjectionMatrix(gl.canvas.width / gl.canvas.height);
 
     // Listener para troca de câmera
     window.addEventListener('keydown', (e) => {
@@ -51,9 +57,6 @@ async function init() {
         } else if (e.key === '2') {
             cameraModeIndex = 1;
             camera.switchMode(1);
-        } else if (e.key === '3') {
-            cameraModeIndex = 2;
-            camera.switchMode(2);
         }
     });
 
@@ -61,13 +64,18 @@ async function init() {
     requestAnimationFrame(render);
 }
 
-function render() {
-    // Update canvas size if needed
-    if (resizeCanvasToDisplaySize(gl.canvas)) {
-        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-        camera.updateProjectionMatrix(gl.canvas.width / gl.canvas.height);
-    }
+function update(deltaTime) {
+    // Update ship
+    ship.update(deltaTime);
+    
+    // Update camera to follow ship
+    const shipPosition = ship.getPosition();
+    const shipDirection = ship.getDirection();
+    camera.setShipTransform(shipPosition, shipDirection);
+    camera.updateViewMatrix();
+}
 
+function draw() {
     // Clear the canvas
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clearDepth(1.0);
@@ -75,41 +83,38 @@ function render() {
     gl.depthFunc(gl.LEQUAL);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-
-    // Placeholder: posição e direção da nave (cube)
-    // Aqui, a nave está sempre na origem e olhando para Z+
-    const shipPosition = [0, 0, 0];
-    const shipDirection = [0, 0, 1];
-    camera.setShipTransform(shipPosition, shipDirection);
-    camera.updateViewMatrix();
-
-    // Create and update model matrix
-    const modelMatrix = mat4.create();
-    rotation += 0.01;
-    mat4.rotate(modelMatrix, modelMatrix, rotation, [0.5, 1, 0]);
-    mat4.scale(modelMatrix, modelMatrix, [0.5, 0.5, 0.5]); // Make the cube smaller
-
-    // Combine matrices
-    const modelViewMatrix = mat4.create();
-    mat4.multiply(modelViewMatrix, camera.getViewMatrix(), modelMatrix);
-
     // Use shader program
     gl.useProgram(programInfo.program);
 
-    // Set uniforms
+    // Set projection matrix
     gl.uniformMatrix4fv(
         programInfo.uniformLocations.projectionMatrix,
         false,
         camera.getProjectionMatrix()
     );
-    gl.uniformMatrix4fv(
-        programInfo.uniformLocations.modelViewMatrix,
-        false,
-        modelViewMatrix
-    );
 
-    // Draw the cube
-    cube.draw(programInfo);
+    // Draw the world grid
+    world.draw(programInfo, camera.getViewMatrix(), camera.getProjectionMatrix());
+
+    // Draw the ship
+    ship.draw(programInfo, camera.getViewMatrix(), camera.getProjectionMatrix());
+}
+
+function render(currentTime) {
+    // Calculate delta time
+    currentTime *= 0.001; // Convert to seconds
+    const deltaTime = currentTime - lastTime;
+    lastTime = currentTime;
+
+    // Update canvas size if needed
+    if (resizeCanvasToDisplaySize(gl.canvas)) {
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        camera.updateProjectionMatrix(gl.canvas.width / gl.canvas.height);
+    }
+
+    // Game loop
+    update(deltaTime);
+    draw();
 
     // Request next frame
     requestAnimationFrame(render);
@@ -120,7 +125,6 @@ init().catch(console.error);
 
 // HUD DURANTE O JOGO
 import { HUD } from './src/ui/hud.js';
-
 const hud = new HUD();
 
 // Quando ganhar pontos:
