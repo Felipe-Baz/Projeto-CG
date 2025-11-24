@@ -25,6 +25,13 @@ export class Ship {
         this.isMoving = false;
         this.currentLevel = 1;
         
+        // Progressive acceleration (unlocked at level 7)
+        this.accelerationUnlocked = false;
+        this.accelerationMultiplier = 1.0; // Multiplicador adicional por segurar teclas
+        this.maxAccelerationMultiplier = 1.40; // Até 40% mais rápido
+        this.accelerationRate = 0.3; // Taxa de aceleração por segundo
+        this.decelerationRate = 2.0; // Taxa de desaceleração (muito rápida)
+        
         // Input state
         this.keys = {
             w: false,
@@ -75,8 +82,28 @@ export class Ship {
             }
         }
         
-        // Calculate current speed based on level
-        this.currentSpeed = this.baseSpeed * this.speedMultiplier;
+        // Progressive acceleration system (only if level 7+)
+        if (this.accelerationUnlocked) {
+            if (this.isMoving) {
+                // Acelera gradualmente enquanto mantém teclas pressionadas
+                this.accelerationMultiplier = Math.min(
+                    this.maxAccelerationMultiplier,
+                    this.accelerationMultiplier + (this.accelerationRate * deltaTime)
+                );
+            } else {
+                // Desacelera drasticamente quando solta as teclas
+                this.accelerationMultiplier = Math.max(
+                    1.0,
+                    this.accelerationMultiplier - (this.decelerationRate * deltaTime)
+                );
+            }
+        } else {
+            // Se ainda não desbloqueou, mantém em 1.0
+            this.accelerationMultiplier = 1.0;
+        }
+        
+        // Calculate current speed (base * level boost * acceleration boost)
+        this.currentSpeed = this.baseSpeed * this.speedMultiplier * this.accelerationMultiplier;
         
         // Update velocity based on input
         this.velocity.x = 0;
@@ -115,6 +142,12 @@ export class Ship {
         if (levelTiers > 0 && level % 5 === 0) {
             console.log(`⚡ Speed boost! Level ${level}: ${(this.speedMultiplier * 100).toFixed(1)}% speed`);
         }
+        
+        // Unlock progressive acceleration at level 7
+        if (level >= 7 && !this.accelerationUnlocked) {
+            this.accelerationUnlocked = true;
+            console.log('🚀 ACCELERATION UNLOCKED! Hold movement keys to build up speed!');
+        }
     }
     
     tryShoot() {
@@ -131,18 +164,33 @@ export class Ship {
     }
     
     getSpeedPercentage() {
-        // Retorna a porcentagem do multiplicador (100% = velocidade base)
+        // Retorna a porcentagem do multiplicador de nível (100% = velocidade base)
         return (this.speedMultiplier - 1.0) * 100;
+    }
+    
+    getAccelerationPercentage() {
+        // Retorna a porcentagem do boost de aceleração (0% a 50%)
+        return (this.accelerationMultiplier - 1.0) * 100;
+    }
+    
+    getTotalSpeedMultiplier() {
+        return this.speedMultiplier * this.accelerationMultiplier;
     }
     
     getSpeedMultiplier() {
         return this.speedMultiplier;
     }
     
+    isAccelerationActive() {
+        return this.accelerationUnlocked && this.accelerationMultiplier > 1.0;
+    }
+    
     resetSpeed() {
         this.speedMultiplier = 1.0;
         this.currentLevel = 1;
         this.currentSpeed = this.baseSpeed;
+        this.accelerationMultiplier = 1.0;
+        this.accelerationUnlocked = false;
     }
     
     getPosition() {

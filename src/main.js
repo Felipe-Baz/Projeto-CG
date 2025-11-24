@@ -185,15 +185,39 @@ function handleGameOver() {
 
 function updateSpeedIndicator() {
     const speedBoostPercentage = ship.getSpeedPercentage();
-    const speedMultiplier = ship.getSpeedMultiplier();
+    const accelerationBoostPercentage = ship.getAccelerationPercentage();
+    const totalBoost = speedBoostPercentage + accelerationBoostPercentage;
+    
     const speedBarFill = document.getElementById('speed-bar-fill');
     const speedValue = document.getElementById('speed-value');
+    const speedLabel = document.getElementById('speed-label');
     
     if (speedBarFill && speedValue) {
-        // Barra vai de 0% a 100% (representando 0% a 50% de boost)
-        const barPercentage = Math.min(100, (speedBoostPercentage / 50) * 100);
+        // Barra vai de 0% a 100% (representando 0% a 60% de boost total)
+        const barPercentage = Math.min(100, (totalBoost / 60) * 100);
         speedBarFill.style.width = barPercentage + '%';
-        speedValue.textContent = '+' + speedBoostPercentage.toFixed(1) + '%';
+        
+        // Mostra boost total
+        if (ship.isAccelerationActive()) {
+            speedValue.textContent = '+' + totalBoost.toFixed(1) + '%';
+            speedValue.style.color = '#00ffff'; // Cyan quando acelerando
+        } else {
+            speedValue.textContent = '+' + speedBoostPercentage.toFixed(1) + '%';
+            speedValue.style.color = '#00ff88'; // Verde normal
+        }
+    }
+    
+    // Update label to show when acceleration is available
+    if (speedLabel) {
+        if (ship.accelerationUnlocked) {
+            if (ship.isAccelerationActive()) {
+                speedLabel.textContent = 'SPEED ⚡';
+            } else {
+                speedLabel.textContent = 'SPEED';
+            }
+        } else {
+            speedLabel.textContent = 'SPEED';
+        }
     }
 }
 
