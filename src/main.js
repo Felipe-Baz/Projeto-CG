@@ -4,6 +4,8 @@ import { Camera } from './webgl/camera.js';
 import { Ship } from './game/player.js';
 import { World } from './game/world.js';
 import { AsteroidManager } from './game/obstacle.js';
+import { BossManager } from './game/boss.js';
+import { Projectile } from './game/projectile.js';
 import { mat4 } from 'https://cdn.skypack.dev/gl-matrix';
 
 let gl;
@@ -12,6 +14,8 @@ let ship;
 let world;
 let camera;
 let asteroidManager;
+let bossManager;
+let projectiles = [];
 // Para controle de câmera
 let cameraModeIndex = 0;
 // Game timing
@@ -47,6 +51,8 @@ async function init() {
     ship = new Ship(gl);
     world = new World(gl, 20);
     asteroidManager = new AsteroidManager(gl, ship);
+    bossManager = new BossManager(gl, asteroidManager);
+    projectiles = [];
     console.log('Ship created at position:', ship.getPosition());
 
     camera = new Camera();
@@ -76,13 +82,78 @@ function update(deltaTime) {
     // Update ship
     ship.update(deltaTime);
     
+    // Handle shooting
+    if (ship.tryShoot()) {
+        const shipPos = ship.getPosition();
+        const projectile = new Projectile(gl, shipPos[0], shipPos[1], shipPos[2]);
+        projectiles.push(projectile);
+    }
+    
+    // Update projectiles
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+        const proj = projectiles[i];
+        proj.update(deltaTime);
+        
+        if (!proj.isActive()) {
+            projectiles.splice(i, 1);
+            continue;
+        }
+        
+        // Check collision with asteroids (projectile stops)
+        let hitAsteroid = false;
+        for (const asteroid of asteroidManager.asteroids) {
+            if (proj.checkCollisionWithAsteroid(asteroid.getPosition(), asteroid.getRadius())) {
+                proj.deactivate();
+                hitAsteroid = true;
+                break;
+            }
+        }
+        
+        if (hitAsteroid) {
+            projectiles.splice(i, 1);
+            continue;
+        }
+        
+        // Check collision with boss
+        const bossHitResult = bossManager.checkProjectileHit(proj.getPosition(), proj.getRadius());
+        if (bossHitResult.hit) {
+            projectiles.splice(i, 1);
+            
+            if (hud) {
+                if (bossHitResult.destroyed) {
+                    // Big bonus for defeating boss
+                    hud.addScore(bossHitResult.scoreBonus);
+                    showBossDefeatedMessage();
+                } else {
+                    // Points for hitting boss
+                    hud.addScore(50);
+                }
+            }
+        }
+    }
+    
+    // Update speed indicator
+    updateSpeedIndicator();
+    
     // Update asteroids and check collisions
     const collisionResult = asteroidManager.update(deltaTime);
     
+    // Get current level
+    const currentLevel = asteroidManager.getDifficultyLevel() + 1;
+    
+    // Update ship speed based on level
+    ship.updateLevel(currentLevel);
+    
+    // Update boss
+    const shipPosition = ship.getPosition();
+    bossManager.update(deltaTime, currentLevel, shipPosition);
+    
     // Update difficulty level in HUD
     if (hud) {
-        const currentLevel = asteroidManager.getDifficultyLevel() + 1; // +1 para mostrar level 1, 2, 3...
         hud.updateLevel(currentLevel);
+        
+        // Update boss health bar if boss is active
+        updateBossHealthBar();
     }
     
     // Add score for dodged asteroids
@@ -99,7 +170,6 @@ function update(deltaTime) {
     }
     
     // Update camera to follow ship
-    const shipPosition = ship.getPosition();
     const shipDirection = ship.getDirection();
     camera.setShipTransform(shipPosition, shipDirection);
     camera.updateViewMatrix();
@@ -111,6 +181,50 @@ function handleGameOver() {
     const finalLevel = asteroidManager.getDifficultyLevel() + 1;
     const gameTime = asteroidManager.getGameTime();
     gameOverScreen.show(finalScore, finalLevel, gameTime);
+}
+
+function updateSpeedIndicator() {
+    const speedBoostPercentage = ship.getSpeedPercentage();
+    const speedMultiplier = ship.getSpeedMultiplier();
+    const speedBarFill = document.getElementById('speed-bar-fill');
+    const speedValue = document.getElementById('speed-value');
+    
+    if (speedBarFill && speedValue) {
+        // Barra vai de 0% a 100% (representando 0% a 50% de boost)
+        const barPercentage = Math.min(100, (speedBoostPercentage / 50) * 100);
+        speedBarFill.style.width = barPercentage + '%';
+        speedValue.textContent = '+' + speedBoostPercentage.toFixed(1) + '%';
+    }
+}
+
+function updateBossHealthBar() {
+    const bossHealthBar = document.getElementById('boss-health-bar');
+    const bossHealthFill = document.getElementById('boss-health-fill');
+    const bossHealthText = document.getElementById('boss-health-text');
+    
+    if (bossManager.isBossActive()) {
+        const boss = bossManager.getBoss();
+        const healthPercent = boss.getHealthPercentage();
+        
+        if (bossHealthBar) {
+            bossHealthBar.style.display = 'flex';
+            if (bossHealthFill) {
+                bossHealthFill.style.width = healthPercent + '%';
+            }
+            if (bossHealthText) {
+                bossHealthText.textContent = `${boss.health}/${boss.maxHealth}`;
+            }
+        }
+    } else {
+        if (bossHealthBar) {
+            bossHealthBar.style.display = 'none';
+        }
+    }
+}
+
+function showBossDefeatedMessage() {
+    console.log('🎉 BOSS DEFEATED! +500 points');
+    // You can add a visual message here later
 }
 
 function draw() {
@@ -136,6 +250,14 @@ function draw() {
 
     // Draw asteroids
     asteroidManager.draw(programInfo, camera.getViewMatrix(), camera.getProjectionMatrix());
+
+    // Draw boss
+    bossManager.draw(programInfo, camera.getViewMatrix(), camera.getProjectionMatrix());
+
+    // Draw projectiles
+    for (const proj of projectiles) {
+        proj.draw(programInfo, camera.getViewMatrix(), camera.getProjectionMatrix());
+    }
 
     // Draw the ship
     ship.draw(programInfo, camera.getViewMatrix(), camera.getProjectionMatrix());
@@ -172,13 +294,20 @@ function resetGame() {
     // Reset HUD
     hud.reset();
     
-    // Reset ship position
+    // Reset ship position and speed
     ship.gridX = 0;
     ship.gridZ = 0;
     ship.velocity = { x: 0, z: 0 };
+    ship.resetSpeed();
     
     // Reset asteroid manager (clears asteroids and difficulty)
     asteroidManager.reset();
+    
+    // Reset boss manager
+    bossManager.reset();
+    
+    // Clear projectiles
+    projectiles = [];
     
     console.log('Game restarted!');
 }

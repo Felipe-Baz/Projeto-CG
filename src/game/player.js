@@ -15,17 +15,29 @@ export class Ship {
         this.gridZ = 0;
         this.gridSize = 1.0; // Size of each grid cell
         
-        // Movement
-        this.speed = 0.15; // Grid cells per update (aumentado de 0.1 para 0.15)
+        // Movement with level-based speed increase
+        this.baseSpeed = 0.12; // Velocidade base
+        this.currentSpeed = this.baseSpeed;
+        this.speedMultiplier = 1.0; // Multiplicador de velocidade baseado no nível
         this.velocity = { x: 0, z: 0 };
+        
+        // Movement state
+        this.isMoving = false;
+        this.currentLevel = 1;
         
         // Input state
         this.keys = {
             w: false,
             a: false,
             s: false,
-            d: false
+            d: false,
+            space: false
         };
+        
+        // Shooting
+        this.canShoot = true;
+        this.shootCooldown = 0.3; // 0.3 seconds between shots
+        this.shootTimer = 0;
         
         // Setup input listeners
         this.setupInput();
@@ -34,35 +46,53 @@ export class Ship {
     setupInput() {
         window.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
-            if (key in this.keys) {
+            if (key === ' ' || key === 'space') {
+                this.keys.space = true;
+            } else if (key in this.keys) {
                 this.keys[key] = true;
             }
         });
         
         window.addEventListener('keyup', (e) => {
             const key = e.key.toLowerCase();
-            if (key in this.keys) {
+            if (key === ' ' || key === 'space') {
+                this.keys.space = false;
+            } else if (key in this.keys) {
                 this.keys[key] = false;
             }
         });
     }
     
     update(deltaTime) {
+        // Check if any movement key is pressed
+        this.isMoving = this.keys.w || this.keys.s || this.keys.a || this.keys.d;
+        
+        // Update shoot cooldown
+        if (this.shootTimer > 0) {
+            this.shootTimer -= deltaTime;
+            if (this.shootTimer <= 0) {
+                this.canShoot = true;
+            }
+        }
+        
+        // Calculate current speed based on level
+        this.currentSpeed = this.baseSpeed * this.speedMultiplier;
+        
         // Update velocity based on input
         this.velocity.x = 0;
         this.velocity.z = 0;
         
         if (this.keys.w) {
-            this.velocity.z += this.speed;
+            this.velocity.z += this.currentSpeed;
         }
         if (this.keys.s) {
-            this.velocity.z -= this.speed;
+            this.velocity.z -= this.currentSpeed;
         }
         if (this.keys.a) {
-            this.velocity.x += this.speed; // Invertido: A agora move para a direita (positivo)
+            this.velocity.x += this.currentSpeed; // Invertido: A agora move para a direita (positivo)
         }
         if (this.keys.d) {
-            this.velocity.x -= this.speed; // Invertido: D agora move para a esquerda (negativo)
+            this.velocity.x -= this.currentSpeed; // Invertido: D agora move para a esquerda (negativo)
         }
         
         // Update position
@@ -73,6 +103,46 @@ export class Ship {
         const maxRange = 10;
         this.gridX = Math.max(-maxRange, Math.min(maxRange, this.gridX));
         this.gridZ = Math.max(-maxRange, Math.min(maxRange, this.gridZ));
+    }
+    
+    updateLevel(level) {
+        this.currentLevel = level;
+        
+        // Aumenta 2.5% a cada 5 níveis
+        const levelTiers = Math.floor(level / 5);
+        this.speedMultiplier = 1.0 + (levelTiers * 0.025);
+        
+        if (levelTiers > 0 && level % 5 === 0) {
+            console.log(`⚡ Speed boost! Level ${level}: ${(this.speedMultiplier * 100).toFixed(1)}% speed`);
+        }
+    }
+    
+    tryShoot() {
+        if (this.canShoot && this.keys.space) {
+            this.canShoot = false;
+            this.shootTimer = this.shootCooldown;
+            return true;
+        }
+        return false;
+    }
+    
+    getCurrentSpeed() {
+        return this.currentSpeed;
+    }
+    
+    getSpeedPercentage() {
+        // Retorna a porcentagem do multiplicador (100% = velocidade base)
+        return (this.speedMultiplier - 1.0) * 100;
+    }
+    
+    getSpeedMultiplier() {
+        return this.speedMultiplier;
+    }
+    
+    resetSpeed() {
+        this.speedMultiplier = 1.0;
+        this.currentLevel = 1;
+        this.currentSpeed = this.baseSpeed;
     }
     
     getPosition() {
